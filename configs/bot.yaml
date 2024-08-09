@@ -1,0 +1,15 @@
+params:
+  parsingInterval: 5
+targets:
+  # - url: https://uk.wikipedia.org/wiki/YAML
+  #   query: '#bodyContent'
+  #   attr: vector-body
+  - url: https://www.scrapingcourse.com/ecommerce/
+    query: '#block-2'
+    attr: class
+  - url: https://www.scrapingcourse.com/ecommerce/
+    query: '#product-list'
+    attr: data-testid
+  - url: https://google.com.ua
+    query: '#product-list'
+    attr: data-testid
