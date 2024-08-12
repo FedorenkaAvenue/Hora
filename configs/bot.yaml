@@ -9,6 +9,9 @@ targets:
   # - url: https://www.olx.ua/uk/moda-i-stil/naruchnye-chasy/
   #   query: '.css-z3gu2d'
   #   attr: href
+  - url: https://ru.stackoverflow.com/questions/tagged/reactjs
+    query: '.s-post-summary--content-title .s-link'
+    attr: href
   - url: https://www.scrapingcourse.com/ecommerce/
     query: '.woocommerce-LoopProduct-link'
     attr: href

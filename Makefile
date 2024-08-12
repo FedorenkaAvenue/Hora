@@ -9,10 +9,6 @@ build: ## Build application
 run: ## Run application without build
 	@go run $(CMD_ROOT_FILE_PATH)
 
-deploy: ## Deploy compiled application to your `/home/$USER/.local/bin` folder
-	@echo "Moving application to /home/USER/.local/bin/ folder..."
-	@sudo cp ./dist/andy /home/${USER}/.local/bin/ && ${OK_RESULT}
-
 dev: ## Run build during any file changing (dev live mode)
 	@echo "Restarting..."
 	ulimit -n 1000

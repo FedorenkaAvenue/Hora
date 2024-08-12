@@ -1,3 +1,4 @@
 .vscode
 /dist
 /db.json
+*.log

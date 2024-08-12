@@ -1,6 +1,6 @@
 # Hora
 
-Parsing sites with wathes.
+Simple bot for site's parsing.
 
 ## Commands
 

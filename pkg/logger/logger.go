@@ -2,17 +2,17 @@ package logger
 
 import (
 	"fmt"
+	"os"
+	"strings"
 	"time"
 )
 
-type Logger struct{}
-
-// const (
-// 	info = iota + 1
-// 	success
-// 	warning
-// 	err
-// )
+const (
+	info    = "info"
+	success = "success"
+	warning = "warning"
+	error   = "error"
+)
 
 const (
 	reset   = "\033[0m"
@@ -26,22 +26,41 @@ const (
 	white   = "\033[97m"
 )
 
-func (l Logger) print(color string, _type string, data ...any) {
-	fmt.Printf(color+"%v. %v: %v.\n"+reset, time.Now().Format(time.Layout), _type, data)
+type Logger struct{}
+
+func (l Logger) Info(data ...any) {
+	l.print(cyan, info, data...)
+	l.writeLog(info, data...)
 }
 
 func (l Logger) Success(data ...any) {
-	l.print(green, "Success", data...)
-}
-
-func (l Logger) Info(data ...any) {
-	l.print(cyan, "Info", data...)
+	l.print(green, success, data...)
 }
 
 func (l Logger) Warning(data ...any) {
-	l.print(yellow, "Warning", data...)
+	l.print(yellow, warning, data...)
+	l.writeLog(warning, data...)
 }
 
 func (l Logger) Error(data ...any) {
-	l.print(red, "Error", data...)
+	l.print(red, error, data...)
+	l.writeLog(error, data...)
+}
+
+func (l Logger) print(color string, _type string, data ...any) {
+	fmt.Printf(color+"%v. %v: %v.\n"+reset, time.Now().Format(time.Layout), strings.ToUpper(_type), data)
+}
+
+func (l Logger) writeLog(_type string, data ...any) {
+	f, err := os.OpenFile(fmt.Sprintf("%v.log", _type), os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+
+	if err != nil {
+		panic(err)
+	}
+
+	defer f.Close()
+
+	if _, err = f.WriteString(fmt.Sprintf("%v. %v.\n", time.Now().Format(time.Layout), data)); err != nil {
+		panic(err)
+	}
 }

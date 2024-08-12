@@ -72,7 +72,7 @@ func (b *bot) scrap(t target) {
 	a, err := b.filter(t, res)
 
 	if err != nil {
-		return
+		panic(err)
 	}
 
 	for _, i := range a {

@@ -46,7 +46,7 @@ func (d *LocalDB) Update(k string, v []string) error {
 
 	dbCopy[k] = v
 
-	j, jErr := json.Marshal(dbCopy)
+	j, jErr := json.MarshalIndent(dbCopy, "", "\t")
 
 	if jErr != nil {
 		return jErr
