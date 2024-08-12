@@ -1,13 +1,14 @@
 params:
+  dbPath: ./db.json
   parsingInterval: 10
 recievers:
   - type: telegram
     token: 7004923945:AAEL8YLDdkFrLNGfFKFaNg3hzLwiCDg7QgI
     chatID: 460110156
 targets:
-  - url: https://www.olx.ua/uk/moda-i-stil/naruchnye-chasy/
-    query: '.css-z3gu2d'
-    attr: href
+  # - url: https://www.olx.ua/uk/moda-i-stil/naruchnye-chasy/
+  #   query: '.css-z3gu2d'
+  #   attr: href
   - url: https://www.scrapingcourse.com/ecommerce/
     query: '.woocommerce-LoopProduct-link'
     attr: href

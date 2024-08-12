@@ -1,9 +1,10 @@
 OK_RESULT= echo "Done😌!"
-CMD_ROOT_FILE_PATH=./cmd/run.go
+CMD_ROOT_FILE_PATH=./main.go
 
 build: ## Build application
 	@echo "Building application..."
 	@go build -o dist/hora $(CMD_ROOT_FILE_PATH) && ${OK_RESULT}
+	@cp ./configs/bot.yaml ./dist/bot.yaml
 
 run: ## Run application without build
 	@go run $(CMD_ROOT_FILE_PATH)
