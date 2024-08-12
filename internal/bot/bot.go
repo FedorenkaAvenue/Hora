@@ -15,16 +15,18 @@ type Bot struct {
 
 func (b *Bot) New() *Bot {
 	b.config = tools.ParseYamlFile[config](config{}, "./configs/bot.yaml")
-	b.notifier = notifier.Notifier{}
+	b.notifier = notifier.Notifier{
+		Recievers: b.config.Recievers,
+	}
 
 	return b
 }
 
 func (b Bot) Run() {
-	timeoutDuration := time.Duration(b.config.Params.ParsingInterval)
+	timeout := time.Duration(b.config.Params.ParsingInterval)
 
 	for {
 		go b.scrap()
-		<-time.After(time.Second * timeoutDuration)
+		<-time.After(time.Second * timeout)
 	}
 }

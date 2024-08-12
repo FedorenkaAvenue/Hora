@@ -1,15 +1,13 @@
 params:
-  parsingInterval: 5
+  parsingInterval: 10
+recievers:
+  - type: telegram
+    token: 7004923945:AAEL8YLDdkFrLNGfFKFaNg3hzLwiCDg7QgI
+    chatID: 460110156
 targets:
-  # - url: https://uk.wikipedia.org/wiki/YAML
-  #   query: '#bodyContent'
-  #   attr: vector-body
+  - url: https://www.olx.ua/uk/moda-i-stil/naruchnye-chasy/
+    query: '.css-z3gu2d'
+    attr: href
   - url: https://www.scrapingcourse.com/ecommerce/
-    query: '#block-2'
-    attr: class
-  - url: https://www.scrapingcourse.com/ecommerce/
-    query: '#product-list'
-    attr: data-testid
-  - url: https://google.com.ua
-    query: '#product-list'
-    attr: data-testid
+    query: '.woocommerce-LoopProduct-link'
+    attr: href

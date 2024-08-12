@@ -5,9 +5,11 @@ import (
 )
 
 type scrapResult struct {
-	value  string
+	value  scrapResultValue
 	failed bool
 }
+
+type scrapResultValue []string
 
 func (b Bot) scrap() {
 	ch := make(chan scrapResult)
@@ -27,7 +29,9 @@ func (b Bot) scrap() {
 		wg.Done()
 
 		if !res.failed {
-			go b.notifier.Post(res.value)
+			for _, v := range res.value {
+				go b.notifier.Post(v)
+			}
 		}
 	}
 }

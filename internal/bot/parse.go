@@ -9,37 +9,44 @@ import (
 
 func (b Bot) parse(t target, ch chan scrapResult) {
 	resp, err := http.Get(t.Url)
-	defer resp.Body.Close()
 
 	if err != nil {
-		go b.log.Error("During http request.", err, t)
+		b.log.Error("During http request.", err, t)
 		ch <- scrapResult{failed: true}
 		return
 	}
+
+	defer resp.Body.Close()
 
 	bytes, _ := io.ReadAll(resp.Body)
 	document, err := goDom.Create(bytes)
 
 	if err != nil {
-		go b.log.Error("During create document.", err, t)
+		b.log.Error("During create document.", err, t)
 		ch <- scrapResult{failed: true}
 		return
 	}
 
-	el, err := document.QuerySelector(t.Query)
+	elements, err := document.QuerySelectorAll(t.Query)
 
 	if err != nil {
-		go b.log.Warning("Element not found. ", t)
+		b.log.Warning("Element not found. ", t)
 		ch <- scrapResult{failed: true}
 		return
 	}
 
-	attr, err := el.GetAttribute(t.Attr)
+	var res scrapResultValue
 
-	if err != nil {
-		go b.log.Warning("Attribute not found.", t)
-		return
+	for _, el := range elements {
+		attr, err := el.GetAttribute(t.Attr)
+
+		if err != nil {
+			b.log.Warning("Attribute not found.", el)
+			continue
+		}
+
+		res = append(res, attr)
 	}
 
-	ch <- scrapResult{value: attr}
+	ch <- scrapResult{value: res}
 }
