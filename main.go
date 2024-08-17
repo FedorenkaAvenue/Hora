@@ -18,15 +18,17 @@ type config struct {
 	Params struct {
 		DBPath          string `yaml:"dbPath"`
 		ParsingInterval int    `yaml:"parsingInterval"`
+		MaxItemAmount   int    `yaml:"maxItemAmount"`
 	}
 	Recievers notifier.Recievers
 	Targets   []target
 }
 
 type target struct {
-	Url   string
-	Query string
-	Attr  string
+	Url               string
+	Query             string // query for goDOM querySelectorAll method
+	Attr              string // which attribute take from searched element
+	LinkWithoutSchema bool   `yaml:"linkWithoutSchema"` // if parsed Attr is link and without schema (http/https)
 }
 
 type bot struct {
@@ -41,7 +43,7 @@ type parseRes []string
 func (b *bot) New() *bot {
 	var db localdb.LocalDB
 
-	b.config = tools.ParseYamlFile[config](config{}, "./configs/bot.yaml")
+	b.config = tools.ParseYamlFile[config](config{}, "./config.yaml")
 	b.notifier = notifier.Notifier{
 		Recievers: b.config.Recievers,
 	}
@@ -80,6 +82,61 @@ func (b *bot) scrap(t target) {
 	}
 }
 
+func (b bot) parse(t target) (parseRes, error) {
+	resp, err := http.Get(t.Url)
+
+	if err != nil {
+		b.log.Error("During http request.", err, t)
+		return nil, errors.New("")
+	}
+
+	defer resp.Body.Close()
+
+	bytes, _ := io.ReadAll(resp.Body)
+	document, err := goDom.Create(bytes)
+
+	if err != nil {
+		b.log.Error("During create document.", err, t)
+		return nil, errors.New("")
+	}
+
+	elements, err := document.QuerySelectorAll(t.Query)
+
+	if err != nil {
+		b.log.Warning("Elements not found. ", t)
+		return nil, errors.New("")
+	}
+
+	var res parseRes
+	amountCount := b.config.Params.MaxItemAmount
+
+	if len(elements) > amountCount {
+		elements = elements[:amountCount]
+	}
+
+	for _, el := range elements {
+		attr, err := el.GetAttribute(t.Attr)
+
+		if err != nil {
+			b.log.Warning("Attribute not found.", el)
+			continue
+		}
+
+		if t.LinkWithoutSchema {
+			attr = resp.Request.URL.Host + attr
+		}
+
+		res = append(res, attr)
+	}
+
+	if len(res) == 0 {
+		b.log.Warning("Attributes are empty. ", t)
+		return nil, errors.New("")
+	}
+
+	return res, nil
+}
+
 func (b *bot) filter(t target, v parseRes) (parseRes, error) {
 	tData, ok := b.db.Data[t.Url]
 
@@ -112,52 +169,6 @@ func (b *bot) filter(t target, v parseRes) (parseRes, error) {
 
 		return news, nil
 	}
-}
-
-func (b bot) parse(t target) (parseRes, error) {
-	resp, err := http.Get(t.Url)
-
-	if err != nil {
-		b.log.Error("During http request.", err, t)
-		return nil, errors.New("")
-	}
-
-	defer resp.Body.Close()
-
-	bytes, _ := io.ReadAll(resp.Body)
-	document, err := goDom.Create(bytes)
-
-	if err != nil {
-		b.log.Error("During create document.", err, t)
-		return nil, errors.New("")
-	}
-
-	elements, err := document.QuerySelectorAll(t.Query)
-
-	if err != nil {
-		b.log.Warning("Elements not found. ", t)
-		return nil, errors.New("")
-	}
-
-	var res parseRes
-
-	for _, el := range elements {
-		attr, err := el.GetAttribute(t.Attr)
-
-		if err != nil {
-			b.log.Warning("Attribute not found.", el)
-			continue
-		}
-
-		res = append(res, attr)
-	}
-
-	if len(res) == 0 {
-		b.log.Warning("Attributes are empty. ", t)
-		return nil, errors.New("")
-	}
-
-	return res, nil
 }
 
 func main() {

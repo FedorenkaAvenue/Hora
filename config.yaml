@@ -1,0 +1,23 @@
+params:
+  dbPath: ./db.json
+  parsingInterval: 600 # seconds
+  maxItemAmount: 10
+recievers:
+  # - type: telegram
+  #   token: 7004923945:AAEL8YLDdkFrLNGfFKFaNg3hzLwiCDg7QgI
+  #   chatID: 460110156
+  - type: telegram
+    token: 7004923945:AAEL8YLDdkFrLNGfFKFaNg3hzLwiCDg7QgI
+    chatID: 4177220110
+targets:
+  - url: https://www.olx.ua/uk/moda-i-stil/naruchnye-chasy/
+    query: '.css-z3gu2d'
+    attr: href
+    linkWithoutSchema: true
+  # - url: https://ru.stackoverflow.com/questions/tagged/reactjs
+  #   query: '.s-post-summary--content-title .s-link'
+  #   attr: href
+  #   linkWithoutSchema: true
+  # - url: https://www.scrapingcourse.com/ecommerce/
+  #   query: '.woocommerce-LoopProduct-link'
+  #   attr: href
