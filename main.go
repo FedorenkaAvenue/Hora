@@ -7,8 +7,8 @@ import (
 	"hora/pkg/notifier"
 	"hora/tools"
 	"io"
+	"maps"
 	"net/http"
-	"slices"
 	"time"
 
 	goDom "github.com/bringmetheaugust/goDOM"
@@ -31,14 +31,14 @@ type target struct {
 	LinkWithoutSchema bool   `yaml:"linkWithoutSchema"` // if parsed Attr is link and without schema (http/https)
 }
 
+type scrapItems localdb.DBItems
+
 type bot struct {
 	config   config
 	log      logger.Logger
 	notifier notifier.Notifier
 	db       localdb.LocalDB
 }
-
-type parseRes []string
 
 func (b *bot) New() *bot {
 	var db localdb.LocalDB
@@ -77,12 +77,12 @@ func (b *bot) scrap(t target) {
 		panic(err)
 	}
 
-	for _, i := range a {
-		go b.notifier.Post(i)
+	for k := range a {
+		go b.notifier.Post(k)
 	}
 }
 
-func (b bot) parse(t target) (parseRes, error) {
+func (b bot) parse(t target) (scrapItems, error) {
 	resp, err := http.Get(t.Url)
 
 	if err != nil {
@@ -107,12 +107,17 @@ func (b bot) parse(t target) (parseRes, error) {
 		return nil, errors.New("")
 	}
 
-	var res parseRes
-	amountCount := b.config.Params.MaxItemAmount
+	res := make(scrapItems)
 
-	if len(elements) > amountCount {
+	switch amountCount := b.config.Params.MaxItemAmount; {
+	case amountCount == 0:
+		break
+	case len(elements) > amountCount:
 		elements = elements[:amountCount]
 	}
+
+	now := time.Now()
+	formattedDate := now.Format("01/02/2006")
 
 	for _, el := range elements {
 		attr, err := el.GetAttribute(t.Attr)
@@ -126,7 +131,7 @@ func (b bot) parse(t target) (parseRes, error) {
 			attr = resp.Request.URL.Host + attr
 		}
 
-		res = append(res, attr)
+		res[attr] = formattedDate
 	}
 
 	if len(res) == 0 {
@@ -137,30 +142,31 @@ func (b bot) parse(t target) (parseRes, error) {
 	return res, nil
 }
 
-func (b *bot) filter(t target, v parseRes) (parseRes, error) {
+func (b *bot) filter(t target, newV scrapItems) (scrapItems, error) {
 	tData, ok := b.db.Data[t.Url]
 
 	if !ok {
-		err := b.db.Update(t.Url, v)
+		err := b.db.Update(t.Url, localdb.DBItems(newV))
 
 		if err != nil {
 			return nil, err
 		}
 
-		return v, nil
+		return newV, nil
 	} else {
-		var news parseRes
+		news := make(scrapItems)
 
-		for _, n := range tData {
-			if !slices.Contains(tData, n) {
-				news = append(news, n)
+		for k, v := range newV {
+			if _, ok := tData[k]; !ok {
+				news[k] = v
 			}
 		}
 
 		if len(news) == 0 {
 			b.log.Info("No new adds: ", t)
 		} else {
-			err := b.db.Update(t.Url, news)
+			maps.Copy(tData, news)
+			err := b.db.Update(t.Url, tData)
 
 			if err != nil {
 				return nil, err

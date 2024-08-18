@@ -1,3 +1,5 @@
+// Stores DB as json file.
+
 package localdb
 
 import (
@@ -10,7 +12,8 @@ type LocalDB struct {
 	Data     db
 }
 
-type db map[string][]string
+type db map[string]DBItems
+type DBItems map[string]string
 
 func (d LocalDB) New(filePath string) LocalDB {
 	var l LocalDB
@@ -37,7 +40,7 @@ func (d LocalDB) New(filePath string) LocalDB {
 	return l
 }
 
-func (d *LocalDB) Update(k string, v []string) error {
+func (d *LocalDB) Update(k string, v DBItems) error {
 	dbCopy := make(db)
 
 	for k, v := range d.Data {

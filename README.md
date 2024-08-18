@@ -32,3 +32,5 @@ targets: # array of sites
  * `make build` build app
  * `make run` run build app
  * `make help` commands help
+ * `make clear_log` clear log files
+ * `make clear_db` clear DB files
