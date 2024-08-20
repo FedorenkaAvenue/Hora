@@ -1,7 +1,8 @@
 params:
-  dbPath: ./db.json
-  parsingInterval: 20 # seconds
+  dbPath: ./dist
+  parsingInterval: 60 # seconds
   # maxItemAmount: 40
+  itemLifePeriod: 2592000 # seconds
 recievers:
   - type: telegram
     token: 7004923945:AAEL8YLDdkFrLNGfFKFaNg3hzLwiCDg7QgI
@@ -10,11 +11,13 @@ recievers:
   #   token: 7004923945:AAEL8YLDdkFrLNGfFKFaNg3hzLwiCDg7QgI
   #   chatID: -4177220110
 targets:
-  - url: https://www.olx.ua/uk/moda-i-stil/naruchnye-chasy/
+  - name: OLX_watch
+    url: https://www.olx.ua/uk/moda-i-stil/naruchnye-chasy/
     query: '.css-u2ayx9 .css-z3gu2d'
     attr: href
     linkWithoutSchema: true
-  # - url: https://ru.stackoverflow.com/questions/tagged/reactjs
+  # - name: SO_reactjs
+  #   url: https://ru.stackoverflow.com/questions/tagged/reactjs
   #   query: '.s-post-summary--content-title .s-link'
   #   attr: href
   #   linkWithoutSchema: true

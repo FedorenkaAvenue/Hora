@@ -18,6 +18,8 @@ github.com/bringmetheaugust/goDOM v0.1.8 h1:Vvm+IjkLLkx2a+6Gr6mCJjb25o9qLNn2uGIS
 github.com/bringmetheaugust/goDOM v0.1.8/go.mod h1:ecW7EZ1cD/iUjZ9DlHQUwlurSyjYFdtkBA3hXnCnrlQ=
 github.com/bringmetheaugust/goDOM v0.1.9 h1:nkC8tV36E1X7wTjk6HYUJBO8TbAyo4AVQaNNBXeR0ns=
 github.com/bringmetheaugust/goDOM v0.1.9/go.mod h1:t46uGfpTGgVUko6ZFEhZZenfPjfAifYQiLU2Tmokf6U=
+github.com/bringmetheaugust/goDOM v0.2.1 h1:3s9A5VWXHVa7SpZxw7H7HgTyaeMJF2wkFa8Y7xn0yCc=
+github.com/bringmetheaugust/goDOM v0.2.1/go.mod h1:t46uGfpTGgVUko6ZFEhZZenfPjfAifYQiLU2Tmokf6U=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=

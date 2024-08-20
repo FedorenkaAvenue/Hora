@@ -7,7 +7,6 @@ import (
 	"hora/pkg/notifier"
 	"hora/tools"
 	"io"
-	"maps"
 	"net/http"
 	"time"
 
@@ -19,19 +18,21 @@ type config struct {
 		DBPath          string `yaml:"dbPath"`
 		ParsingInterval int    `yaml:"parsingInterval"`
 		MaxItemAmount   int    `yaml:"maxItemAmount"`
+		ItemLifePeriod  int64  `yaml:"itemLifePeriod"`
 	}
 	Recievers notifier.Recievers
 	Targets   []target
 }
 
 type target struct {
+	Name              string
 	Url               string
 	Query             string // query for goDOM querySelectorAll method
 	Attr              string // which attribute take from searched element
 	LinkWithoutSchema bool   `yaml:"linkWithoutSchema"` // if parsed Attr is link and without schema (http/https)
 }
 
-type scrapItems localdb.DBItems
+type scrapItems []string
 
 type bot struct {
 	config   config
@@ -41,13 +42,20 @@ type bot struct {
 }
 
 func (b *bot) New() *bot {
-	var db localdb.LocalDB
+	var dbNames []string
 
 	b.config = tools.ParseYamlFile[config](config{}, "./config.yaml")
-	b.notifier = notifier.Notifier{
-		Recievers: b.config.Recievers,
+	b.notifier = notifier.Notifier{Recievers: b.config.Recievers}
+	b.db = localdb.LocalDB{
+		StorePath:      b.config.Params.DBPath,
+		ItemLifePeriod: b.config.Params.ItemLifePeriod,
 	}
-	b.db = db.New(b.config.Params.DBPath)
+
+	for _, t := range b.config.Targets {
+		dbNames = append(dbNames, t.Name)
+	}
+
+	b.db.Init(dbNames)
 
 	return b
 }
@@ -77,8 +85,8 @@ func (b *bot) scrap(t target) {
 		panic(err)
 	}
 
-	for k := range a {
-		go b.notifier.Post(k)
+	for _, v := range a {
+		go b.notifier.Post(v)
 	}
 }
 
@@ -107,7 +115,7 @@ func (b bot) parse(t target) (scrapItems, error) {
 		return nil, errors.New("")
 	}
 
-	res := make(scrapItems)
+	var res scrapItems
 
 	switch amountCount := b.config.Params.MaxItemAmount; {
 	case amountCount == 0:
@@ -115,9 +123,6 @@ func (b bot) parse(t target) (scrapItems, error) {
 	case len(elements) > amountCount:
 		elements = elements[:amountCount]
 	}
-
-	now := time.Now()
-	formattedDate := now.Format("01/02/2006")
 
 	for _, el := range elements {
 		attr, err := el.GetAttribute(t.Attr)
@@ -131,7 +136,7 @@ func (b bot) parse(t target) (scrapItems, error) {
 			attr = resp.Request.URL.Host + attr
 		}
 
-		res[attr] = formattedDate
+		res = append(res, attr)
 	}
 
 	if len(res) == 0 {
@@ -143,10 +148,10 @@ func (b bot) parse(t target) (scrapItems, error) {
 }
 
 func (b *bot) filter(t target, newV scrapItems) (scrapItems, error) {
-	tData, ok := b.db.Data[t.Url]
+	tData, ok := b.db.Data[t.Name]
 
 	if !ok {
-		err := b.db.Update(t.Url, localdb.DBItems(newV))
+		err := b.db.Append(t.Name, newV)
 
 		if err != nil {
 			return nil, err
@@ -154,19 +159,18 @@ func (b *bot) filter(t target, newV scrapItems) (scrapItems, error) {
 
 		return newV, nil
 	} else {
-		news := make(scrapItems)
+		var news scrapItems
 
-		for k, v := range newV {
-			if _, ok := tData[k]; !ok {
-				news[k] = v
+		for _, i := range newV {
+			if _, ok := tData[i]; !ok {
+				news = append(news, i)
 			}
 		}
 
 		if len(news) == 0 {
-			b.log.Info("No new adds: ", t)
+			b.log.Info("No new adds:", t.Name)
 		} else {
-			maps.Copy(tData, news)
-			err := b.db.Update(t.Url, tData)
+			err := b.db.Append(t.Name, news)
 
 			if err != nil {
 				return nil, err

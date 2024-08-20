@@ -17,7 +17,8 @@ recievers: # array of messanger configs
     chatID: int # chat id
   - ... # abother reciever
 targets: # array of sites
-  - url: string # site url
+  - name: # target alias
+    url: string # site url
     query: string # query string for querySelectorAll method
     attr: string # which attribute get from parsed element
     linkWithoutSchema: bool # if target.attr is link and it has no schema (http/https). Bot will add schema to the responce message
