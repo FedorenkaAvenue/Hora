@@ -1,5 +1,5 @@
 params:
-  dbPath: ./dist
+  dbPath: ./db
   parsingInterval: 60 # seconds
   # maxItemAmount: 40
   itemLifePeriod: 2592000 # seconds

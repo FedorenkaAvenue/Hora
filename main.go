@@ -27,9 +27,9 @@ type config struct {
 type target struct {
 	Name              string
 	Url               string
-	Query             string // query for goDOM querySelectorAll method
-	Attr              string // which attribute take from searched element
-	LinkWithoutSchema bool   `yaml:"linkWithoutSchema"` // if parsed Attr is link and without schema (http/https)
+	Query             string
+	Attr              string
+	LinkWithoutSchema bool `yaml:"linkWithoutSchema"`
 }
 
 type scrapItems []string
@@ -150,15 +150,7 @@ func (b bot) parse(t target) (scrapItems, error) {
 func (b *bot) filter(t target, newV scrapItems) (scrapItems, error) {
 	tData, ok := b.db.Data[t.Name]
 
-	if !ok {
-		err := b.db.Append(t.Name, newV)
-
-		if err != nil {
-			return nil, err
-		}
-
-		return newV, nil
-	} else {
+	if ok {
 		var news scrapItems
 
 		for _, i := range newV {
@@ -178,6 +170,14 @@ func (b *bot) filter(t target, newV scrapItems) (scrapItems, error) {
 		}
 
 		return news, nil
+	} else {
+		err := b.db.Append(t.Name, newV)
+
+		if err != nil {
+			return nil, err
+		}
+
+		return newV, nil
 	}
 }
 

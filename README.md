@@ -11,6 +11,7 @@ params:
   dbPath: string # local DB store location
   parsingInterval: int # parsing interval in seconds
   maxItemAmount: int # max items amount parsed
+  itemLifePeriod: int # item life period in seconds
 recievers: # array of messanger configs
   - type: const string # type of messanger (check in pkg/notifier/notifier.go)
     token: string # messanger token 
@@ -30,8 +31,8 @@ targets: # array of sites
 
  * `make install` install all dependencies (dev and prod)
  * `make dev` run app in dev environment
+ * `make run` run unbuild app
  * `make build` build app
- * `make run` run build app
+ * `make build_and_run` run build app
  * `make help` commands help
  * `make clear_log` clear log files
- * `make clear_db` clear DB files
