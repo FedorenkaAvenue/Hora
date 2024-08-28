@@ -1,5 +1,4 @@
 params:
-  dbPath: ./db
   parsingInterval: 60 # seconds
   # maxItemAmount: 40
   itemLifePeriod: 2592000 # seconds
@@ -13,14 +12,15 @@ recievers:
 targets:
   - name: OLX_watch
     url: https://www.olx.ua/uk/moda-i-stil/naruchnye-chasy/
-    query: '.css-u2ayx9 .css-z3gu2d'
-    attr: href
+    itemLinkQuery: ".css-u2ayx9 .css-z3gu2d"
     linkWithoutSchema: true
-  # - name: SO_reactjs
-  #   url: https://ru.stackoverflow.com/questions/tagged/reactjs
-  #   query: '.s-post-summary--content-title .s-link'
-  #   attr: href
-  #   linkWithoutSchema: true
-  # - url: https://www.scrapingcourse.com/ecommerce/
-  #   query: '.woocommerce-LoopProduct-link'
-  #   attr: href
+    items:
+      - title:
+          query: "......"
+          value: name
+        href:
+          query: "..."
+          attr: "href"
+        price:
+          query: ".."
+          minValue: 50

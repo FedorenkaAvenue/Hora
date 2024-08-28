@@ -1,1 +1,2 @@
 *.yaml linguist-detectable=true
+*.toml linguist-detectable=true

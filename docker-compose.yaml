@@ -1,0 +1,21 @@
+services:
+  scraper:
+    container_name: hora_scraper
+    restart: unless-stopped
+    build:
+      context: ./scraper
+      dockerfile: Dockerfile
+    volumes:
+      - ./config.yaml:/app/tmp/config.yaml
+      - ./scraper:/app
+    depends_on:
+      - db
+
+  db:
+    container_name: hora_db
+    restart: unless-stopped
+    image: mongo
+    volumes:
+      - ./db/data:/data/db
+    ports:
+      - 27017:27017
