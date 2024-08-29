@@ -2,13 +2,12 @@
 
 Simple bot for site parsing.
 
-## Config file
+<!-- ## Config file
 
 `./config.yaml` is for example
 
 ```yaml
 params:
-  dbPath: string # local DB store location
   parsingInterval: int # parsing interval in seconds
   maxItemAmount: int # max items amount parsed
   itemLifePeriod: int # item life period in seconds
@@ -16,23 +15,23 @@ recievers: # array of messanger configs
   - type: const string # type of messanger (check in pkg/notifier/notifier.go)
     token: string # messanger token 
     chatID: int # chat id
-  - ... # abother reciever
+  - ... # another reciever
 targets: # array of sites
   - name: # target alias
     url: string # site url
-    query: string # query string for querySelectorAll method
-    attr: string # which attribute get from parsed element
+    itemLinkQuery: string # query string for DOM querySelectorAll method. get element from html page
     linkWithoutSchema: bool # if target.attr is link and it has no schema (http/https). Bot will add schema to the responce message
-  - ... # another target
+  - params:
+      - price:
+          query: ".css-90xrc0" # query string for DOM querySelectorAll method. get element from html page
+          minValue: 50
+        title:
+          query: ".css-1kc83jo"
+          value: "Boss"
+      - ... # another param
 
-```
+``` -->
 
-## Commands
+<!-- ## Commands
 
- * `make install` install all dependencies (dev and prod)
- * `make dev` run app in dev environment
- * `make run` run unbuild app
- * `make build` build app
- * `make build_and_run` run build app
- * `make help` commands help
- * `make clear_log` clear log files
+ * `make clear_log` clear log files -->

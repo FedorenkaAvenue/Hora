@@ -2,13 +2,16 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"hora/pkg/logger"
 	"hora/pkg/notifier"
 	"hora/tools"
 	"io"
 	"net/http"
+	"net/url"
+	"regexp"
+	"strconv"
+	"strings"
 	"time"
 
 	goDom "github.com/bringmetheaugust/goDOM"
@@ -37,16 +40,15 @@ type config struct {
 type target struct {
 	Name              string
 	Url               string
-	ItemLinkQuery     string `yaml:"itemLinkQuery"`
-	LinkWithoutSchema bool   `yaml:"linkWithoutSchema"`
-	Items             []Item
+	ItemLinkQuery     string      `yaml:"itemLinkQuery"`
+	LinkWithoutSchema bool        `yaml:"linkWithoutSchema"`
+	Params            []Parameter `yaml:"params"`
+	host              host
 }
 
-type Item struct {
-	Href struct {
-		Query string
-		Attr  string
-	}
+type host *url.URL
+
+type Parameter struct {
 	Title struct {
 		Query string
 		Value string
@@ -74,7 +76,7 @@ func (b *bot) New() *bot {
 	client, err := mongo.Connect(ctx, clientOptions)
 
 	if err != nil {
-		panic("Cann't connect to Mongo")
+		panic(fmt.Sprintf("Cann't connect to db\n. %v", err))
 	}
 
 	b.db = client
@@ -82,59 +84,74 @@ func (b *bot) New() *bot {
 	return b
 }
 
-func (b bot) Run() {
+func (b *bot) Run() {
 	timeout := time.Duration(b.config.Params.ParsingInterval)
 
 	for {
 		for _, t := range b.config.Targets {
-			go b.scrap(t)
+			go b.scrap(&t)
 		}
 
 		<-time.After(time.Second * timeout)
 	}
 }
 
-func (b *bot) scrap(t target) {
-	res, err := b.getTarget(t)
+func (b *bot) scrap(t *target) {
+	l, err := b.parse(t)
 
 	if err != nil {
+		b.log.Error(t.Name, err)
+		panic(err)
+	}
+
+	n := b.filter(*t, l)
+
+	if len(n) == 0 {
+		b.log.Info("No new adds for", t.Name)
 		return
 	}
 
-	b.filter(t, res)
+	b.log.Info("new adds: ", n)
 
-	// if err != nil {
-	// 	panic(err)
-	// }
-
-	// for _, v := range a {
-	// 	b.notifier.Post(v)
-	// }
+	for _, l := range n {
+		go b.match(*t, l)
+	}
 }
 
-func (b bot) getTarget(t target) (scrapItems, error) {
-	resp, err := http.Get(t.Url)
+func (b bot) getDocument(link string) (*goDom.Document, host, error) {
+	resp, err := http.Get(link)
 
 	if err != nil {
-		b.log.Error("During http request.", err, t)
-		return nil, errors.New("")
+		return nil, nil, fmt.Errorf("during http request : %v", err)
 	}
 
 	defer resp.Body.Close()
+
+	host := resp.Request.URL
 
 	bytes, _ := io.ReadAll(resp.Body)
 	document, err := goDom.Create(bytes)
 
 	if err != nil {
-		b.log.Error("During create document.", err, t)
-		return nil, errors.New("")
+		return nil, nil, fmt.Errorf("during create document : %v", err)
 	}
+
+	return document, host, nil
+}
+
+func (b bot) parse(t *target) (scrapItems, error) {
+	document, host, err := b.getDocument(t.Url)
+
+	if err != nil {
+		return nil, err
+	}
+
+	t.host = host
 
 	elements, err := document.QuerySelectorAll(t.ItemLinkQuery)
 
 	if err != nil {
-		b.log.Error("Elements not found. ", t)
-		return nil, errors.New("")
+		return nil, fmt.Errorf("elements with '%v' not found in %v", t.ItemLinkQuery, t.Url)
 	}
 
 	switch amountCount := b.config.Params.MaxItemAmount; {
@@ -147,11 +164,11 @@ func (b bot) getTarget(t target) (scrapItems, error) {
 	var links scrapItems
 
 	for _, l := range elements {
-		attr, aErr := l.GetAttribute("href")
+		attr, err := l.GetAttribute("href")
 
-		if aErr != nil {
-			b.log.Error("Attribute not found", l)
-			continue
+		if err != nil {
+			b.log.Error("href attribute not found.")
+			panic(err)
 		}
 
 		links = append(links, attr)
@@ -160,67 +177,88 @@ func (b bot) getTarget(t target) (scrapItems, error) {
 	return links, nil
 }
 
-func (b *bot) filter(t target, items scrapItems) {
+func (b *bot) filter(t target, items scrapItems) scrapItems {
 	c := b.db.Database("scrapped").Collection(t.Name)
-
-	res, _ := c.Find(ctx, bson.D{{Key: "url", Value: items[0]}})
-
-	fmt.Println(res)
+	var news scrapItems
 
 	for _, i := range items {
-		// res, _ := c.Find(ctx, bson.D{{Key: "url", Value: i}})
-		_, err := c.InsertOne(ctx, dbItem{ID: i})
+		err := c.FindOne(ctx, bson.D{{Key: "_id", Value: i}}).Decode(&dbItem{})
 
 		if err != nil {
-			fmt.Printf("%v", err)
+			_, err := c.InsertOne(ctx, dbItem{ID: i})
+
+			if err != nil {
+				panic(fmt.Sprintf("Error during adding db item: %v", err))
+			}
+
+			news = append(news, i)
 		}
 	}
 
-	// _, err := c.InsertOne(ctx, dbItem{name: "loh"})
+	return news
+}
 
-	// tData, ok := b.db.Data[t.Name]
-	// var newItems scrapItems
+func (b *bot) match(t target, l string) {
+	if t.LinkWithoutSchema {
+		l = t.host.Scheme + "://" + t.host.Host + l
+	}
 
-	// if ok {
-	// 	for _, el := range newV {
-	// 		linkEl, lErr := el.QuerySelector(t.ItemLinkQuery)
+	document, _, err := b.getDocument(l)
 
-	// 		if lErr != nil {
-	// 			b.log.Warning("Link element not found.", el)
-	// 			continue
-	// 		}
+	if err != nil {
+		b.log.Error(err)
+		panic(err)
+	}
 
-	// 		link, hErr := linkEl.GetAttribute("href") // var res scrapItems
+rootLoop:
+	for _, i := range t.Params {
+		if i.Price.Query != "" {
+			price, err := document.QuerySelector(i.Price.Query)
 
-	// 		if hErr != nil {
-	// 			b.log.Warning("Link attribute not found.", el)
-	// 			continue
-	// 		}
+			if err != nil {
+				b.log.Error("Price not found. ", l, i.Price.Query)
+				panic(err)
+			}
 
-	// 		if _, ok := tData[link]; ok {
-	// 			continue
-	// 		} else {
-	// 			// if t.LinkWithoutSchema {
-	// 			// 	attr = resp.Request.URL.Host + attr
-	// 			// }
+			re := regexp.MustCompile(`\d+`)
+			match := re.FindString(price.TextContent)
 
-	// 			newItems = append(newItems, link)
-	// 			// main
-	// 		}
-	// 	}
+			if match != "" {
+				number, err := strconv.Atoi(match)
 
-	// 	if len(newItems) == 0 {
-	// 		b.log.Info("No new adds:", t.Name)
-	// 	} else {
-	// 		b.db.Append(t.Name, newItems)
-	// 	}
+				if err != nil {
+					b.log.Error("Error converting to integer: ", err)
+					panic(err)
+				} else {
+					if i.Price.MinValue != 0 && number < i.Price.MinValue {
+						b.log.Info("Item doesn't matched by min price", l, i.Price.MinValue)
+						continue rootLoop
+					}
+				}
+			} else {
+				b.log.Error("Cann't get price number from text content: ", l, i)
+				continue rootLoop
+			}
+		}
 
-	// 	return newItems, nil
-	// } else {
-	// 	b.db.Append(t.Name, newItems)
-	// }
+		if i.Title.Query != "" {
+			title, err := document.QuerySelector(i.Title.Query)
 
-	// return newItems, nil
+			if err != nil {
+				b.log.Error("Title not found: ", l, i)
+				panic(err)
+			}
+
+			if !strings.Contains(title.TextContent, i.Title.Value) {
+				b.log.Info("Item doesn't contain title", l, i.Title.Value)
+				continue rootLoop
+			}
+		}
+
+		go b.notifier.Post(l)
+
+		break
+	}
 }
 
 func main() {

@@ -1,5 +1,5 @@
 params:
-  parsingInterval: 60 # seconds
+  parsingInterval: 20 # seconds
   # maxItemAmount: 40
   itemLifePeriod: 2592000 # seconds
 recievers:
@@ -10,17 +10,14 @@ recievers:
   #   token: 7004923945:AAEL8YLDdkFrLNGfFKFaNg3hzLwiCDg7QgI
   #   chatID: -4177220110
 targets:
-  - name: OLX_watch
+  - name: olx_watch
     url: https://www.olx.ua/uk/moda-i-stil/naruchnye-chasy/
     itemLinkQuery: ".css-u2ayx9 .css-z3gu2d"
     linkWithoutSchema: true
-    items:
-      - title:
-          query: "......"
-          value: name
-        href:
-          query: "..."
-          attr: "href"
-        price:
-          query: ".."
+    params:
+      - price:
+          query: ".css-90xrc0"
           minValue: 50
+        title:
+          query: ".css-1kc83jo"
+          value: "Boss"

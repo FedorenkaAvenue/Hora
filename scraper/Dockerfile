@@ -1,7 +1,5 @@
 FROM golang:1.22-alpine
 
-EXPOSE 4000
-
 WORKDIR /app
 
 COPY go.mod go.sum ./

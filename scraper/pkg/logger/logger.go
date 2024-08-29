@@ -52,7 +52,7 @@ func (l Logger) print(color string, _type string, data ...any) {
 }
 
 func (l Logger) writeLog(_type string, data ...any) {
-	f, err := os.OpenFile(fmt.Sprintf("%v.log", _type), os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+	f, err := os.OpenFile(fmt.Sprintf("%v.log", _type), os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0777)
 
 	if err != nil {
 		panic(err)
