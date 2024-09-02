@@ -1,7 +1,5 @@
 params:
   parsingInterval: 20 # seconds
-  # maxItemAmount: 40
-  itemLifePeriod: 2592000 # seconds
 recievers:
   - type: telegram
     token: 7004923945:AAEL8YLDdkFrLNGfFKFaNg3hzLwiCDg7QgI

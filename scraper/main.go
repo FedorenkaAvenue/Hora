@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -29,9 +30,7 @@ type bot struct {
 
 type config struct {
 	Params struct {
-		ParsingInterval int   `yaml:"parsingInterval"`
-		MaxItemAmount   int   `yaml:"maxItemAmount"`
-		ItemLifePeriod  int64 `yaml:"itemLifePeriod"`
+		ParsingInterval int `yaml:"parsingInterval"`
 	}
 	Recievers notifier.Recievers
 	Targets   []target
@@ -60,11 +59,17 @@ type Parameter struct {
 }
 
 type dbItem struct {
-	ID        string    `bson:"_id"`
-	CreatedAt time.Time `bson:"created_at"`
+	ID        string `bson:"_id"`
+	CreatedAt int64  `bson:"created_at"`
 }
 
 type scrapItems []string
+
+const (
+	dbScrapped         string        = "scrapped"
+	itemLifePeriod     time.Duration = time.Hour * 24 * 30
+	clearItemsInterval time.Duration = time.Hour * 24
+)
 
 var ctx = context.TODO()
 
@@ -72,7 +77,8 @@ func (b *bot) New() *bot {
 	b.config = tools.ParseYamlFile[config](config{}, "./tmp/config.yaml")
 	b.notifier = notifier.Notifier{Recievers: b.config.Recievers}
 
-	clientOptions := options.Client().ApplyURI("mongodb://hora_db")
+	credential := options.Credential{Username: os.Getenv("DB_USER"), Password: os.Getenv("DB_PASSWORD")}
+	clientOptions := options.Client().ApplyURI("mongodb://hora_db").SetAuth(credential)
 	client, err := mongo.Connect(ctx, clientOptions)
 
 	if err != nil {
@@ -84,8 +90,15 @@ func (b *bot) New() *bot {
 	return b
 }
 
-func (b *bot) Run() {
+func (b bot) Run() {
 	timeout := time.Duration(b.config.Params.ParsingInterval)
+
+	go func() {
+		for {
+			b.clearParsedItems()
+			<-time.After(clearItemsInterval)
+		}
+	}()
 
 	for {
 		for _, t := range b.config.Targets {
@@ -96,7 +109,7 @@ func (b *bot) Run() {
 	}
 }
 
-func (b *bot) scrap(t *target) {
+func (b bot) scrap(t *target) {
 	l, err := b.parse(t)
 
 	if err != nil {
@@ -118,47 +131,18 @@ func (b *bot) scrap(t *target) {
 	}
 }
 
-func (b bot) getDocument(link string) (*goDom.Document, host, error) {
-	resp, err := http.Get(link)
-
-	if err != nil {
-		return nil, nil, fmt.Errorf("during http request : %v", err)
-	}
-
-	defer resp.Body.Close()
-
-	host := resp.Request.URL
-
-	bytes, _ := io.ReadAll(resp.Body)
-	document, err := goDom.Create(bytes)
-
-	if err != nil {
-		return nil, nil, fmt.Errorf("during create document : %v", err)
-	}
-
-	return document, host, nil
-}
-
 func (b bot) parse(t *target) (scrapItems, error) {
-	document, host, err := b.getDocument(t.Url)
+	document, host, err := getDocument(t.Url)
 
 	if err != nil {
 		return nil, err
 	}
 
 	t.host = host
-
 	elements, err := document.QuerySelectorAll(t.ItemLinkQuery)
 
 	if err != nil {
 		return nil, fmt.Errorf("elements with '%v' not found in %v", t.ItemLinkQuery, t.Url)
-	}
-
-	switch amountCount := b.config.Params.MaxItemAmount; {
-	case amountCount == 0:
-		break
-	case len(elements) > amountCount:
-		elements = elements[:amountCount]
 	}
 
 	var links scrapItems
@@ -177,15 +161,16 @@ func (b bot) parse(t *target) (scrapItems, error) {
 	return links, nil
 }
 
-func (b *bot) filter(t target, items scrapItems) scrapItems {
-	c := b.db.Database("scrapped").Collection(t.Name)
+func (b bot) filter(t target, items scrapItems) scrapItems {
+	c := b.db.Database(dbScrapped).Collection(t.Name)
 	var news scrapItems
+	d := time.Now().Unix()
 
 	for _, i := range items {
 		err := c.FindOne(ctx, bson.D{{Key: "_id", Value: i}}).Decode(&dbItem{})
 
 		if err != nil {
-			_, err := c.InsertOne(ctx, dbItem{ID: i})
+			_, err := c.InsertOne(ctx, dbItem{ID: i, CreatedAt: d})
 
 			if err != nil {
 				panic(fmt.Sprintf("Error during adding db item: %v", err))
@@ -198,12 +183,12 @@ func (b *bot) filter(t target, items scrapItems) scrapItems {
 	return news
 }
 
-func (b *bot) match(t target, l string) {
+func (b bot) match(t target, l string) {
 	if t.LinkWithoutSchema {
 		l = t.host.Scheme + "://" + t.host.Host + l
 	}
 
-	document, _, err := b.getDocument(l)
+	document, _, err := getDocument(l)
 
 	if err != nil {
 		b.log.Error(err)
@@ -259,6 +244,53 @@ rootLoop:
 
 		break
 	}
+}
+
+func (b bot) clearParsedItems() {
+	colls, err := b.db.Database(dbScrapped).ListCollectionNames(ctx, bson.D{})
+
+	if err != nil {
+		b.log.Error("Cann't get colleections list names: ", err)
+		panic("Cann't get colleections list names.")
+	}
+
+	d := time.Now().Unix() - int64(itemLifePeriod)
+
+	for _, c := range colls {
+		c := b.db.Database(dbScrapped).Collection(c)
+		res, err := c.DeleteMany(ctx, bson.D{{
+			Key: "created_at", Value: bson.D{{
+				Key: "$lte", Value: d,
+			}},
+		}})
+
+		if err != nil {
+			b.log.Error("Cann't get old items: ", err)
+			panic("Cann't get old items.")
+		}
+
+		b.log.Success("Cleaned ", *res, " items.")
+	}
+}
+
+func getDocument(link string) (*goDom.Document, host, error) {
+	resp, err := http.Get(link)
+
+	if err != nil {
+		return nil, nil, fmt.Errorf("during http request : %v", err)
+	}
+
+	defer resp.Body.Close()
+
+	host := resp.Request.URL
+	bytes, _ := io.ReadAll(resp.Body)
+	document, err := goDom.Create(bytes)
+
+	if err != nil {
+		return nil, nil, fmt.Errorf("during create document : %v", err)
+	}
+
+	return document, host, nil
 }
 
 func main() {
