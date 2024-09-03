@@ -1,0 +1,17 @@
+services:
+  scraper:
+    container_name: hora_scraper
+    environment:
+      - DB_USER
+      - DB_PASSWORD
+    depends_on:
+      - db
+
+  db:
+    container_name: hora_db
+    image: mongo
+    ports:
+      - 27017:27017
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=$DB_USER
+      - MONGO_INITDB_ROOT_PASSWORD=$DB_PASSWORD

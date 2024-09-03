@@ -1,6 +1,5 @@
 services:
   scraper:
-    container_name: hora_scraper
     restart: unless-stopped
     build:
       context: ./scraper
@@ -8,20 +7,8 @@ services:
     volumes:
       - ./config.yaml:/app/tmp/config.yaml
       - ./scraper:/app
-    environment:
-      - DB_USER
-      - DB_PASSWORD
-    depends_on:
-      - db
 
   db:
-    container_name: hora_db
     restart: unless-stopped
-    image: mongo
     volumes:
       - ./db/data:/data/db
-    ports:
-      - 27017:27017
-    environment:
-      - MONGO_INITDB_ROOT_USERNAME=$DB_USER
-      - MONGO_INITDB_ROOT_PASSWORD=$DB_PASSWORD
