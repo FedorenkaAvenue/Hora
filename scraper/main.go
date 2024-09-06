@@ -11,8 +11,10 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	goDom "github.com/bringmetheaugust/goDOM"
@@ -50,7 +52,7 @@ type host *url.URL
 type Parameter struct {
 	Title struct {
 		Query string
-		Value string
+		Value []string
 	}
 	Price struct {
 		Query    string
@@ -64,6 +66,12 @@ type dbItem struct {
 }
 
 type scrapItems []string
+
+type matchedItem struct {
+	link    string
+	matched bool
+	err     interface{}
+}
 
 const (
 	dbScrapped         string        = "scrapped"
@@ -91,11 +99,16 @@ func (b *bot) New() *bot {
 }
 
 func (b bot) Run() {
-	timeout := time.Duration(b.config.Params.ParsingInterval)
+	t := time.Duration(b.config.Params.ParsingInterval)
 
 	go func() {
 		for {
-			b.clearParsedItems()
+			err := b.clearOldItems()
+
+			if err != nil {
+				b.log.Error(err)
+			}
+
 			<-time.After(clearItemsInterval)
 		}
 	}()
@@ -105,41 +118,82 @@ func (b bot) Run() {
 			go b.scrap(&t)
 		}
 
-		<-time.After(time.Second * timeout)
+		<-time.After(time.Second * t)
 	}
 }
 
-func (b bot) scrap(t *target) {
-	l, err := b.parse(t)
+func (b *bot) scrap(t *target) {
+	defer func() {
+		if err := recover(); err != nil {
+			b.log.Warning("Skip target ", t.Name)
+			b.config.Targets = slices.DeleteFunc(b.config.Targets, func(e target) bool {
+				return e.Name == t.Name
+			})
+		}
+	}()
+
+	p, err := b.parseTarget(t)
 
 	if err != nil {
 		b.log.Error(t.Name, err)
 		panic(err)
 	}
 
-	n := b.filter(*t, l)
+	f, err := b.filterItems(*t, p)
 
-	if len(n) == 0 {
+	if err != nil {
+		b.log.Error(t.Name, err)
+		panic(err)
+	}
+
+	if len(f) == 0 {
 		b.log.Info("No new adds for", t.Name)
 		return
 	}
 
-	b.log.Info("new adds: ", n)
+	b.log.Info("new adds: ", f)
 
-	for _, l := range n {
-		go b.match(*t, l)
+	var matched scrapItems
+
+	if len(t.Params) > 0 {
+		ch := make(chan matchedItem)
+		var wg sync.WaitGroup
+
+		go func() {
+			wg.Wait()
+			close(ch)
+		}()
+
+		for _, l := range f {
+			wg.Add(1)
+			go b.matchItem(*t, l, ch, &wg)
+		}
+
+		for r := range ch {
+			if r.err == nil && r.matched {
+				matched = append(matched, r.link)
+			}
+		}
+	} else {
+		matched = f
 	}
+
+	for _, l := range matched {
+		go b.notifier.Post(l)
+	}
+
+	b.appendItems(t, f)
 }
 
-func (b bot) parse(t *target) (scrapItems, error) {
-	document, host, err := getDocument(t.Url)
+func (b bot) parseTarget(t *target) (scrapItems, error) {
+	d, host, err := getDocument(t.Url)
 
 	if err != nil {
 		return nil, err
 	}
 
 	t.host = host
-	elements, err := document.QuerySelectorAll(t.ItemLinkQuery)
+	e, err := d.QuerySelectorAll(t.ItemLinkQuery)
 
 	if err != nil {
 		return nil, fmt.Errorf("elements with '%v' not found in %v", t.ItemLinkQuery, t.Url)
@@ -147,76 +201,92 @@ func (b bot) parse(t *target) (scrapItems, error) {
 
 	var links scrapItems
 
-	for _, l := range elements {
-		attr, err := l.GetAttribute("href")
+	for _, l := range e {
+		a, err := l.GetAttribute("href")
 
 		if err != nil {
-			b.log.Error("href attribute not found.")
-			panic(err)
+			return nil, fmt.Errorf("attribute href not found inside '%v in %v", t.ItemLinkQuery, t.Url)
 		}
 
-		links = append(links, attr)
+		links = append(links, a)
 	}
 
 	return links, nil
 }
 
-func (b bot) filter(t target, items scrapItems) scrapItems {
+func (b bot) filterItems(t target, items scrapItems) (scrapItems, error) {
 	c := b.db.Database(dbScrapped).Collection(t.Name)
 	var news scrapItems
-	d := time.Now().Unix()
 
 	for _, i := range items {
 		err := c.FindOne(ctx, bson.D{{Key: "_id", Value: i}}).Decode(&dbItem{})
 
 		if err != nil {
-			_, err := c.InsertOne(ctx, dbItem{ID: i, CreatedAt: d})
-
-			if err != nil {
-				panic(fmt.Sprintf("Error during adding db item: %v", err))
-			}
-
 			news = append(news, i)
 		}
 	}
 
-	return news
+	return news, nil
 }
 
-func (b bot) match(t target, l string) {
+func (b bot) appendItems(t *target, items scrapItems) error {
+	c := b.db.Database(dbScrapped).Collection(t.Name)
+	d := time.Now().Unix()
+	var m []interface{}
+
+	for _, i := range items {
+		m = append(m, dbItem{ID: i, CreatedAt: d})
+	}
+
+	_, err := c.InsertMany(ctx, m)
+
+	if err != nil {
+		return fmt.Errorf("error during adding db item: %v", err)
+	}
+
+	return nil
+}
+
+func (b bot) matchItem(t target, l string, ch chan matchedItem, wg *sync.WaitGroup) {
+	defer func() {
+		wg.Done()
+
+		if err := recover(); err != nil {
+			b.log.Error(err)
+			ch <- matchedItem{l, false, err}
+		}
+	}()
+
 	if t.LinkWithoutSchema {
 		l = t.host.Scheme + "://" + t.host.Host + l
 	}
 
-	document, _, err := getDocument(l)
+	d, _, err := getDocument(l)
 
 	if err != nil {
-		b.log.Error(err)
-		panic(err)
+		panic(fmt.Errorf("cann't get document for '%v': %v", l, err))
 	}
 
 rootLoop:
 	for _, i := range t.Params {
-		if i.Price.Query != "" {
-			price, err := document.QuerySelector(i.Price.Query)
+		if q, m := i.Price.Query, i.Price.MinValue; q != "" {
+			p, err := d.QuerySelector(q)
 
 			if err != nil {
-				b.log.Error("Price not found. ", l, i.Price.Query)
-				panic(err)
+				panic(fmt.Errorf("price not found: %v, %v", l, q))
 			}
 
 			re := regexp.MustCompile(`\d+`)
-			match := re.FindString(price.TextContent)
+			match := re.FindString(p.TextContent)
 
 			if match != "" {
-				number, err := strconv.Atoi(match)
+				n, err := strconv.Atoi(match)
 
 				if err != nil {
-					b.log.Error("Error converting to integer: ", err)
-					panic(err)
+					panic(fmt.Errorf("error converting to integer: %v", err))
 				} else {
-					if i.Price.MinValue != 0 && number < i.Price.MinValue {
-						b.log.Info("Item doesn't matched by min price", l, i.Price.MinValue)
+					if m != 0 && n < m {
+						b.log.Info("Item doesn't matched by min price", l, m)
 						continue rootLoop
 					}
 				}
@@ -226,32 +296,32 @@ rootLoop:
 			}
 		}
 
-		if i.Title.Query != "" {
-			title, err := document.QuerySelector(i.Title.Query)
+		if q, v := i.Title.Query, i.Title.Value; q != "" {
+			t, err := d.QuerySelector(q)
 
 			if err != nil {
-				b.log.Error("Title not found: ", l, i)
-				panic(err)
+				panic(fmt.Errorf("title not found in %v by %v query", l, q))
 			}
 
-			if !strings.Contains(title.TextContent, i.Title.Value) {
-				b.log.Info("Item doesn't contain title", l, i.Title.Value)
+			if !slices.ContainsFunc(v, func(e string) bool {
+				return strings.Contains(t.TextContent, e)
+			}) {
+				b.log.Info("Item doesn't contain title", l, v)
 				continue rootLoop
 			}
 		}
 
-		go b.notifier.Post(l)
-
-		break
+		ch <- matchedItem{l, true, nil}
 	}
+
+	ch <- matchedItem{l, false, nil}
 }
 
-func (b bot) clearParsedItems() {
+func (b bot) clearOldItems() error {
 	colls, err := b.db.Database(dbScrapped).ListCollectionNames(ctx, bson.D{})
 
 	if err != nil {
-		b.log.Error("Cann't get colleections list names: ", err)
-		panic("Cann't get colleections list names.")
+		return fmt.Errorf("cann't get colleections list names: '%v", err)
 	}
 
 	d := time.Now().Unix() - int64(itemLifePeriod)
@@ -265,25 +335,26 @@ func (b bot) clearParsedItems() {
 		}})
 
 		if err != nil {
-			b.log.Error("Cann't get old items: ", err)
-			panic("Cann't get old items.")
+			return fmt.Errorf("cann't get old items: '%v", err)
 		}
 
 		b.log.Success("Cleaned ", *res, " items.")
 	}
+
+	return nil
 }
 
 func getDocument(link string) (*goDom.Document, host, error) {
-	resp, err := http.Get(link)
+	r, err := http.Get(link)
 
-	if err != nil {
+	if err != nil || r.StatusCode >= 400 {
 		return nil, nil, fmt.Errorf("during http request : %v", err)
 	}
 
-	defer resp.Body.Close()
+	defer r.Body.Close()
 
-	host := resp.Request.URL
-	bytes, _ := io.ReadAll(resp.Body)
+	host := r.Request.URL
+	bytes, _ := io.ReadAll(r.Body)
 	document, err := goDom.Create(bytes)
 
 	if err != nil {

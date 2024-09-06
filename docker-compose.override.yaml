@@ -1,6 +1,9 @@
 services:
   scraper:
     container_name: hora_scraper
+    build:
+      args:
+        - GO_VERSION
     environment:
       - DB_USER
       - DB_PASSWORD

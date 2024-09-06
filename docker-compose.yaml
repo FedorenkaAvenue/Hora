@@ -4,9 +4,11 @@ services:
     build:
       context: ./scraper
       dockerfile: Dockerfile
+      args:
+        - GO_VERSION
     volumes:
-      - ./config.yaml:/app/tmp/config.yaml
       - ./scraper:/app
+      - ./config.yaml:/app/tmp/config.yaml
 
   db:
     restart: unless-stopped

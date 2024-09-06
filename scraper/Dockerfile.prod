@@ -1,4 +1,6 @@
-FROM golang:1.22-alpine as builder
+ARG GO_VERSION
+
+FROM golang:${GO_VERSION}-alpine as builder
 
 WORKDIR /app
 
@@ -7,7 +9,7 @@ COPY . .
 RUN go mod download
 RUN CGO_ENABLED=0 GOOS=linux go build -o hora
 
-FROM golang:1.22-alpine
+FROM golang:${GO_VERSION}-alpine
 
 WORKDIR /app
 

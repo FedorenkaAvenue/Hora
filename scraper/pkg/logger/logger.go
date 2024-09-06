@@ -28,30 +28,30 @@ const (
 
 type Logger struct{}
 
-func (l Logger) Info(data ...any) {
+func (l Logger) Info(data ...interface{}) {
 	l.print(cyan, info, data...)
 	l.writeLog(info, data...)
 }
 
-func (l Logger) Success(data ...any) {
+func (l Logger) Success(data ...interface{}) {
 	l.print(green, success, data...)
 }
 
-func (l Logger) Warning(data ...any) {
+func (l Logger) Warning(data ...interface{}) {
 	l.print(yellow, warning, data...)
 	l.writeLog(warning, data...)
 }
 
-func (l Logger) Error(data ...any) {
+func (l Logger) Error(data ...interface{}) {
 	l.print(red, error, data...)
 	l.writeLog(error, data...)
 }
 
-func (l Logger) print(color string, _type string, data ...any) {
+func (l Logger) print(color string, _type string, data ...interface{}) {
 	fmt.Printf(color+"%v. %v: %v.\n"+reset, time.Now().Format(time.Layout), strings.ToUpper(_type), data)
 }
 
-func (l Logger) writeLog(_type string, data ...any) {
+func (l Logger) writeLog(_type string, data ...interface{}) {
 	f, err := os.OpenFile(fmt.Sprintf("%v.log", _type), os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0777)
 
 	if err != nil {

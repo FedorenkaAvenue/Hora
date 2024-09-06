@@ -18,4 +18,9 @@ targets:
           minValue: 50
         title:
           query: ".css-1kc83jo"
-          value: "Boss"
+          value:
+            - "годинник"
+            - "часы"
+  # - name: tonya_inst
+  #   url: https://www.picuki.com/profile/tonya04_
+  #   itemLinkQuery: ".photo"
