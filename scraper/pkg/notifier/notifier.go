@@ -5,21 +5,21 @@ import (
 	"net/http"
 )
 
-type Notifier struct {
-	Recievers
-}
+type (
+	Notifier struct {
+		Recievers
+	}
 
-type Recievers []recieverConfig
+	Recievers []recieverConfig
 
-type recieverConfig struct {
-	Type   string
-	Token  string
-	ChatID string `yaml:"chatID"`
-}
-
-const (
-	telegram = "telegram"
+	recieverConfig struct {
+		Type   string
+		Token  string
+		ChatID string `yaml:"chatID"`
+	}
 )
+
+const telegram = "telegram"
 
 func (n Notifier) Post(msg string) {
 	for _, r := range n.Recievers {

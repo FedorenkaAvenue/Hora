@@ -23,55 +23,57 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-type bot struct {
-	config   config
-	log      logger.Logger
-	notifier notifier.Notifier
-	db       *mongo.Client
-}
-
-type config struct {
-	Params struct {
-		ParsingInterval int `yaml:"parsingInterval"`
+type (
+	bot struct {
+		config   config
+		log      logger.Logger
+		notifier notifier.Notifier
+		db       *mongo.Client
 	}
-	Recievers notifier.Recievers
-	Targets   []target
-}
 
-type target struct {
-	Name              string
-	Url               string
-	ItemLinkQuery     string      `yaml:"itemLinkQuery"`
-	LinkWithoutSchema bool        `yaml:"linkWithoutSchema"`
-	Params            []Parameter `yaml:"params"`
-	host              host
-}
-
-type host *url.URL
-
-type Parameter struct {
-	Title struct {
-		Query string
-		Value []string
+	config struct {
+		Params struct {
+			ParsingInterval int `yaml:"parsingInterval"`
+		}
+		Recievers notifier.Recievers
+		Targets   []target
 	}
-	Price struct {
-		Query    string
-		MinValue int
+
+	target struct {
+		Name              string
+		Url               string
+		ItemLinkQuery     string      `yaml:"itemLinkQuery"`
+		LinkWithoutSchema bool        `yaml:"linkWithoutSchema"`
+		Params            []Parameter `yaml:"params"`
+		host              host
 	}
-}
 
-type dbItem struct {
-	ID        string `bson:"_id"`
-	CreatedAt int64  `bson:"created_at"`
-}
+	host *url.URL
 
-type scrapItems []string
+	Parameter struct {
+		Title struct {
+			Query string
+			Value []string
+		}
+		Price struct {
+			Query    string
+			MinValue int
+		}
+	}
 
-type matchedItem struct {
-	link    string
-	matched bool
-	err     interface{}
-}
+	dbItem struct {
+		ID        string `bson:"_id"`
+		CreatedAt int64  `bson:"created_at"`
+	}
+
+	scrapItems []string
+
+	matchedItem struct {
+		link    string
+		matched bool
+		err     interface{}
+	}
+)
 
 const (
 	dbScrapped         string        = "scrapped"
